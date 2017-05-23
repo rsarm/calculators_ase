@@ -1,4 +1,4 @@
-"""This module defines an ASE calculator 'rdk'.
+"""This module defines an ASE calculator 'obc'.
 
 """
 

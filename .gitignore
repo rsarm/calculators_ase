@@ -1,5 +1,4 @@
 *.pyc
 __pycache__
 *.so
-tests/obc.py
-tests/ccc.xyz
+tests/traj_ccc.xyz
