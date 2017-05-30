@@ -8,12 +8,13 @@ from ase.calculators.obc import OBC
 from ase.optimize import BFGS
 from ase.vibrations import Vibrations
 from ase.atoms import Atoms
+from ase.io    import read
 
-
-
-mol=Atoms('HH')
-mol.positions=np.array([[0.70,0.00,0.00],[0.00,0.00,0.00]])
-
+if len(sys.argv)==1:
+   mol=Atoms('HH')
+   mol.positions=np.array([[0.70,0.00,0.00],[0.00,0.00,0.00]])
+else:
+   mol=read(sys.argv[1])
 
 calc=OBC()
 calc.parameters['ff']='uff'

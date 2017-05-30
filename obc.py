@@ -34,7 +34,7 @@ def ase2xyz(m):
 
 
 
-def e_ff(mol,ffname):
+def e_ff(mol,ffname,ffunitfactor):
     """Potential energy computed with a force field of openbabel.
 
     * mol :: ase Atoms object
@@ -56,13 +56,13 @@ def e_ff(mol,ffname):
     ff.Setup(obmol)
 
     # The factor 4.1572299 is R/2 (half the gas constant)
-    return ff.Energy() * units.kcal / units.mol / 4.15722990 # Result in eV
+    return ff.Energy() * units.kcal / units.mol * ffunitfactor # Result in eV
 
 
 
 
 
-def numeric_force(atoms, a, i, ffname, d=0.0001):
+def numeric_force(atoms, a, i, ffname,ffunitfactor, d=0.0001):
     """Evaluate force along i'th axis on a'th atom using finite difference.
 
     This will trigger two calls to get_potential_energy(), with atom a moved
@@ -72,9 +72,9 @@ def numeric_force(atoms, a, i, ffname, d=0.0001):
     """
     p0 = atoms.positions[a, i]
     atoms.positions[a, i] += d
-    eplus  = e_ff(atoms,ffname)
+    eplus  = e_ff(atoms,ffname,ffunitfactor)
     atoms.positions[a, i] -= 2 * d
-    eminus = e_ff(atoms,ffname)
+    eminus = e_ff(atoms,ffname,ffunitfactor)
     atoms.positions[a, i] = p0
 
 
@@ -83,14 +83,14 @@ def numeric_force(atoms, a, i, ffname, d=0.0001):
 
 
 
-def f_ff(atoms,ffname):
+def f_ff(atoms,ffname,ffunitfactor):
     """Evaluate numeric forces.
 
     Args:
     * atoms     :: ASE Atoms object
     """
 
-    return np.array([[numeric_force(atoms, a, i, ffname)
+    return np.array([[numeric_force(atoms, a, i, ffname,ffunitfactor)
             for i in range(3)] for a in range(len(atoms))])
 
 
@@ -137,9 +137,19 @@ class OBC(Calculator):
         Calculator.calculate(self, atoms, properties, system_changes)
 
         ffname  = self.parameters.ff
+
+        # Fixing the units for each ForceField
+        # Results are given in eV.
+        # The factor 4.1572299 is R/2 (half the gas constant)
+        if ffname == 'uff' or ffname=='gaff':
+            ffunitfactor = 0.24054479161712947364 #=  1.0 / 4.15722990
+        if ffname == 'ghemical':
+            ffunitfactor = 0.12027239580856473682 #=  0.5 / 4.15722990
+        if ffname == 'mmff94' or ffname == 'mmff94s' :
+            ffunitfactor = 1.
         #alphas  = self.parameters.alphas
         #gamma   = self.parameters.gamma
 
-        self.results['energy'] = e_ff(self.atoms,ffname)
-        self.results['forces'] = f_ff(self.atoms,ffname)
+        self.results['energy'] = e_ff(self.atoms,ffname,ffunitfactor)
+        self.results['forces'] = f_ff(self.atoms,ffname,ffunitfactor)
 
