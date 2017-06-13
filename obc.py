@@ -98,7 +98,6 @@ def f_ff(atoms,ffname,ffunitfactor):
 
 
 
-
 class OBC(Calculator):
     """OBC.
 
@@ -131,6 +130,8 @@ class OBC(Calculator):
     def __init__(self, **kwargs):
         Calculator.__init__(self, **kwargs)
 
+
+
     def calculate(self, atoms=None, properties=['energy'],
                   system_changes=['positions', 'numbers', 'cell',
                                   'pbc', 'charges', 'magmoms']):
@@ -152,4 +153,49 @@ class OBC(Calculator):
 
         self.results['energy'] = e_ff(self.atoms,ffname,ffunitfactor)
         self.results['forces'] = f_ff(self.atoms,ffname,ffunitfactor)
+
+
+
+    def autoopt(self,atoms,nsteps=500,loglevel=0):
+        """Using the optimizer implemented in OB."""
+
+        #Setting up openbabel
+        obmol = pybel.ob.OBMol()
+        obconversion = pybel.ob.OBConversion()
+        obconversion.SetInAndOutFormats("xyz", "mol")
+
+        obconversion.ReadString(obmol,ase2xyz(atoms))
+
+        # Get the ff 
+        ff=pybel.ob.OBForceField.FindForceField(self.parameters.ff)
+        ff.SetLogLevel(loglevel) # the highest pybel.ob.OBFF_LOGLVL_HIGH is 3
+        ff.SetLogToStdErr() 
+        ff.Setup(obmol)
+
+        #ff.ConjugateGradients(nsteps)
+        ff.SteepestDescent(nsteps)
+        #
+        ff.GetCoordinates(obmol)
+
+        opt_positions=[[a.x(),a.y(),a.z()] for a in pybel.ob.OBMolAtomIter(obmol)]
+
+        atoms.set_positions(np.array(opt_positions))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
