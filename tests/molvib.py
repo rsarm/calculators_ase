@@ -23,8 +23,8 @@ mol.set_calculator(calc)
 
 
 # Relax
-BFGS(mol).run(fmax=0.005)
-
+#BFGS(mol).run(fmax=0.005)
+calc.autoopt(mol)
 
 vib = Vibrations(mol)
 
