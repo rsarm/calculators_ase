@@ -11,6 +11,25 @@ import pybel
 
 
 
+def ob_forcefield(atoms,ffname):
+    #Setting up openbabel
+    obmol = pybel.ob.OBMol()
+    obconversion = pybel.ob.OBConversion()
+    obconversion.SetInAndOutFormats("xyz", "mol")
+
+    # Openbabel reads the mol as .xyz string
+    obconversion.ReadString(obmol,ase2xyz(atoms))
+
+
+    # Get the ff 
+    ff=pybel.ob.OBForceField.FindForceField(ffname)
+    #ff.SetLogLevel(pybel.ob.OBFF_LOGLVL_HIGH) 
+    #ff.SetLogToStdErr() 
+    ff.Setup(obmol)
+
+    return (ff,obmol)
+
+
 
 
 
@@ -34,29 +53,19 @@ def ase2xyz(m):
 
 
 
-def e_ff(mol,ffname,ffunitfactor):
+
+
+
+def e_ff(atoms,ffname,ffunitfactor):
     """Potential energy computed with a force field of openbabel.
 
-    * mol :: ase Atoms object
+    * atoms :: ase Atoms object
     """
 
-    #Setting up openbabel
-    obmol = pybel.ob.OBMol()
-    obconversion = pybel.ob.OBConversion()
-    obconversion.SetInAndOutFormats("xyz", "mol")
-
-    # Openbabel reads the mol as .xyz string
-    obconversion.ReadString(obmol,ase2xyz(mol))
-
-
-    # Get the ff 
-    ff=pybel.ob.OBForceField.FindForceField(ffname)
-    #ff.SetLogLevel(pybel.ob.OBFF_LOGLVL_HIGH) 
-    #ff.SetLogToStdErr() 
-    ff.Setup(obmol)
+    obff=ob_forcefield(atoms,ffname)[0]
 
     # The factor 4.1572299 is R/2 (half the gas constant)
-    return ff.Energy() * units.kcal / units.mol * ffunitfactor # Result in eV
+    return obff.Energy() * units.kcal / units.mol * ffunitfactor # Result in eV
 
 
 
@@ -117,6 +126,11 @@ class OBC(Calculator):
 
     print mol.get_potential_energy()
     print mol.get_forces()
+
+    #Optimize geometry with autoopt()
+    calc.autoopt(mol)
+    print mol.get_potential_energy()
+    print mol.get_forces()
     """
 
 
@@ -127,14 +141,20 @@ class OBC(Calculator):
 
     nolabel = True
 
+
+
+
     def __init__(self, **kwargs):
         Calculator.__init__(self, **kwargs)
+
+
 
 
 
     def calculate(self, atoms=None, properties=['energy'],
                   system_changes=['positions', 'numbers', 'cell',
                                   'pbc', 'charges', 'magmoms']):
+
         Calculator.calculate(self, atoms, properties, system_changes)
 
         ffname  = self.parameters.ff
@@ -142,7 +162,7 @@ class OBC(Calculator):
         # Fixing the units for each ForceField
         # Results are given in eV.
         # The factor 4.1572299 is R/2 (half the gas constant)
-        if ffname == 'uff' or ffname=='gaff':
+        if ffname == 'uff'    or ffname=='gaff':
             ffunitfactor = 0.24054479161712947364 #=  1.0 / 4.15722990
         if ffname == 'ghemical':
             ffunitfactor = 0.12027239580856473682 #=  0.5 / 4.15722990
@@ -156,26 +176,26 @@ class OBC(Calculator):
 
 
 
-    def autoopt(self,atoms,nsteps=500,loglevel=0):
-        """Using the optimizer implemented in OB."""
 
-        #Setting up openbabel
-        obmol = pybel.ob.OBMol()
-        obconversion = pybel.ob.OBConversion()
-        obconversion.SetInAndOutFormats("xyz", "mol")
 
-        obconversion.ReadString(obmol,ase2xyz(atoms))
+    def autoopt(self,atoms,nsteps=500,loglevel=0,algo='sd'):
+        """Geometry optimization using the optimizer implemented
+        in OpenBabel.
+        """
 
-        # Get the ff 
-        ff=pybel.ob.OBForceField.FindForceField(self.parameters.ff)
-        ff.SetLogLevel(loglevel) # the highest pybel.ob.OBFF_LOGLVL_HIGH is 3
-        ff.SetLogToStdErr() 
-        ff.Setup(obmol)
+        obff,obmol=ob_forcefield(atoms,self.parameters.ff)
 
-        #ff.ConjugateGradients(nsteps)
-        ff.SteepestDescent(nsteps)
+        # The highest is 3 (pybel.ob.OBFF_LOGLVL_HIGH)
+        obff.SetLogLevel(loglevel)
+        obff.SetLogToStdErr() 
+
+        # Optimization algorithms
+        if algo.lower()=='cg' or algo.lower()=='conjugategradients':
+            ff.ConjugateGradients(nsteps)
+        if algo.lower()=='sd' or algo.lower()=='steepestdescent':
+            obff.SteepestDescent(nsteps)
         #
-        ff.GetCoordinates(obmol)
+        obff.GetCoordinates(obmol)
 
         opt_positions=[[a.x(),a.y(),a.z()] for a in pybel.ob.OBMolAtomIter(obmol)]
 
