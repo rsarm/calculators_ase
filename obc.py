@@ -46,6 +46,9 @@ def ase2xyz(m):
 
     xyz=str(N)+'\nMol  0.0  0.0\n'
 
+    # Loop first over the first N-1 atoms.
+    # The last line of the xyz file is added after the loop
+    # to avoid the an empty line at the end of the file.
     for i in range(N-1):
         xyz+=m.get_chemical_symbols()[i]+ ' '.join("%16.8f" % n for n in m.positions[i])+'\n'
 
