@@ -3,3 +3,4 @@ __pycache__
 *.so
 tests/traj_ccc.xyz
 tests/newmol.xyz
+.gitignore
