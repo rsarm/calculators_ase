@@ -75,7 +75,7 @@ for s,atm in enumerate(atoms.positions):
             write_formated(atoms.get_forces()[s])
 
 
-MaxwellBoltzmannDistribution(atoms, 9000 * units.kB)
+MaxwellBoltzmannDistribution(atoms, 500 * units.kB)
 dyn = VelocityVerlet(atoms, .08 * units.fs)   # 10.2 * units.f
 
 for i in range(1000):

@@ -10,6 +10,10 @@ from ase.vibrations import Vibrations
 from ase.atoms import Atoms
 from ase.io    import read
 
+
+
+# Run without command-line arguments to get the H2 molecule
+# or pass a xyz file as command-line argument.
 if len(sys.argv)==1:
    mol=Atoms('HH')
    mol.positions=np.array([[0.70,0.00,0.00],[0.00,0.00,0.00]])
@@ -17,7 +21,6 @@ else:
    mol=read(sys.argv[1])
 
 calc=OBC(atoms=mol,ff='uff')
-#calc.parameters['ff']='uff'
 
 #mol.set_calculator(calc)
 
