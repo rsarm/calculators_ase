@@ -47,17 +47,6 @@ def ase2xyz(atoms):
 
 
 
-#In [120]: for i,a in enumerate(pybel.ob.OBMolAtomIter(m.OBMol)):
-#     ...:     a.SetVector(i*3*0.2,0.1,0.0)
-#
-#In [121]: ff.SetCoordinates(m.OBMol)
-#Out[121]: True
-#
-#In [122]: ff.Energy()
-#Out[122]: 868.463711181507
-
-
-
 
 def ob_forcefield(atoms,ffname):
     """Sets up the OB force field."""
@@ -73,8 +62,10 @@ def ob_forcefield(atoms,ffname):
 
     # Get the FF
     ff=pybel.ob.OBForceField.FindForceField(ffname)
-    #ff.SetLogLevel(pybel.ob.OBFF_LOGLVL_HIGH)
-    #ff.SetLogToStdErr()
+
+    ff.SetLogLevel(0) # pybel.ob.OBFF_LOGLVL_HIGH
+    ff.SetLogToStdErr()
+
     ff.Setup(obmol)
 
     return (ff,obmol)
@@ -107,6 +98,7 @@ def e_ff(atoms, obmol, obff, ffunitfactor):
 
 
 
+
 def numeric_force(atoms, a, i, obmol, obff, ffunitfactor, d):
     """Evaluate force along i'th axis on a'th atom using finite difference.
 
@@ -124,6 +116,7 @@ def numeric_force(atoms, a, i, obmol, obff, ffunitfactor, d):
 
 
     return (eminus - eplus) / (2 * d)
+
 
 
 
@@ -187,7 +180,8 @@ class OBC(Calculator):
 
         self.ffname = kwargs['ff']
 
-        self.obff, self.obmol = ob_forcefield(kwargs['atoms'],kwargs['ff'])
+        # Initializing the FF and the OBMol object
+        self.obff, self.obmol = ob_forcefield(kwargs['atoms'], kwargs['ff'])
 
 
 
@@ -224,24 +218,33 @@ class OBC(Calculator):
         in OpenBabel.
         """
 
-        obff,obmol=ob_forcefield(atoms,self.parameters.ff)
-
         # The highest is 3 (pybel.ob.OBFF_LOGLVL_HIGH)
-        obff.SetLogLevel(loglevel)
-        obff.SetLogToStdErr()
+        self.obff.SetLogLevel(loglevel)
+        self.obff.SetLogToStdErr()
 
         # Optimization algorithms
         if algo.lower()=='cg' or algo.lower()=='conjugategradients':
-            ff.ConjugateGradients(nsteps)
+            self.obff.ConjugateGradients(nsteps)
         if algo.lower()=='sd' or algo.lower()=='steepestdescent':
-            obff.SteepestDescent(nsteps)
+            self.obff.SteepestDescent(nsteps)
         #
-        #obff.GetCoordinates(obmol)
-        obff.UpdateCoordinates(obmol)
 
-        opt_positions=[[a.x(),a.y(),a.z()] for a in pybel.ob.OBMolAtomIter(obmol)]
+        #obff.GetCoordinates(obmol)
+        self.obff.UpdateCoordinates(self.obmol)
+
+        opt_positions=[[a.x(),a.y(),a.z()] for a in pybel.ob.OBMolAtomIter(self.obmol)]
 
         atoms.set_positions(np.array(opt_positions))
+
+        self.obff.SetLogLevel(0) # setting loglevel back to 0
+
+
+
+
+
+
+
+
 
 
 
