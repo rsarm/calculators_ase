@@ -35,7 +35,7 @@ def ase2xyz(atoms):
 
     # Loop first over the first N-1 atoms.
     # The last line of the xyz file is added after the loop
-    # to avoid the an empty line at the end of the file.
+    # to avoid an empty line at the end of the file.
     for i in range(N-1):
         xyz+=atoms.get_chemical_symbols()[i]+\
         ' '.join("%16.8f" % n for n in atoms.positions[i])+'\n'
@@ -51,7 +51,7 @@ def ase2xyz(atoms):
 def ob_forcefield(atoms,ffname):
     """Sets up the OB force field."""
 
-    #Setting up openbabel
+    # Setting up openbabel
     obmol = pybel.ob.OBMol()
     obconversion = pybel.ob.OBConversion()
     obconversion.SetInAndOutFormats("xyz", "mol")
@@ -91,7 +91,7 @@ def e_ff(atoms, obmol, obff, ffunitfactor):
     obff.SetCoordinates(obmol)
 
     # The factor 4.1572299 is R/2 (half the gas constant)
-    return obff.Energy() * units.kcal / units.mol * ffunitfactor # Result in eV
+    return obff.Energy() * ffunitfactor # Result in eV
 
 
 
@@ -159,7 +159,7 @@ class OBC(Calculator):
     print mol.get_potential_energy()
     print mol.get_forces()
 
-    #Optimize geometry with autoopt()
+    # Optimize geometry with autoopt()
     calc.autoopt(mol)
     print mol.get_potential_energy()
     print mol.get_forces()
@@ -183,6 +183,18 @@ class OBC(Calculator):
         # Initializing the FF and the OBMol object
         self.obff, self.obmol = ob_forcefield(kwargs['atoms'], kwargs['ff'])
 
+        # Fixing the units for each ForceField
+        # Results are given in eV.
+        # The factor 4.1572299 is R/2 (half the gas constant)
+        if self.ffname == 'uff'    or self.ffname=='gaff':
+            self.ffunitfactor = 0.24054479161712947364 #=  1.0 / 4.15722990
+        if self.ffname == 'ghemical':
+            self.ffunitfactor = 0.12027239580856473682 #=  0.5 / 4.15722990
+        if self.ffname == 'mmff94' or self.ffname == 'mmff94s' :
+            self.ffunitfactor = 1.
+
+        self.ffunitfactor = self.ffunitfactor * units.kcal / units.mol
+
 
 
 
@@ -194,20 +206,12 @@ class OBC(Calculator):
 
         Calculator.calculate(self, atoms, properties, system_changes)
 
+        # Parameters
         nfd     = self.parameters.nfd
 
-        # Fixing the units for each ForceField
-        # Results are given in eV.
-        # The factor 4.1572299 is R/2 (half the gas constant)
-        if self.ffname == 'uff'    or self.ffname=='gaff':
-            ffunitfactor = 0.24054479161712947364 #=  1.0 / 4.15722990
-        if self.ffname == 'ghemical':
-            ffunitfactor = 0.12027239580856473682 #=  0.5 / 4.15722990
-        if self.ffname == 'mmff94' or self.ffname == 'mmff94s' :
-            ffunitfactor = 1.
 
-        self.results['energy'] = e_ff(self.atoms, self.obmol, self.obff, ffunitfactor)
-        self.results['forces'] = f_ff(self.atoms, self.obmol, self.obff, ffunitfactor, nfd)
+        self.results['energy'] = e_ff(self.atoms, self.obmol, self.obff, self.ffunitfactor)
+        self.results['forces'] = f_ff(self.atoms, self.obmol, self.obff, self.ffunitfactor, nfd)
 
 
 
@@ -237,6 +241,39 @@ class OBC(Calculator):
         atoms.set_positions(np.array(opt_positions))
 
         self.obff.SetLogLevel(0) # setting loglevel back to 0
+
+
+
+    def get_potential_energies(self,atoms):
+        """Energy splitted by terms.
+
+        This is a redefinition of get_potential_energies(),
+        with a pourpose different to what it's originally intended.
+
+        """
+
+        terms_dict={
+        'Bond Stretching'      : self.obff.E_Bond()          * self.ffunitfactor,
+        'Angle Bending'        : self.obff.E_Angle()         * self.ffunitfactor,
+        'Stretch-Bending'      : self.obff.E_StrBnd()        * self.ffunitfactor,
+        'Out-Of-Plane Bending' : self.obff.E_OOP()           * self.ffunitfactor,
+        'Torsional'            : self.obff.E_Torsion()       * self.ffunitfactor,
+        'Van der Waals'        : self.obff.E_VDW()           * self.ffunitfactor,
+        'Electrostatic'        : self.obff.E_Electrostatic() * self.ffunitfactor
+        }
+
+        for k in terms_dict.keys():
+            print '%30s %12.6f' % (k,terms_dict[k])
+
+
+        etot = sum([terms_dict[k] for k in terms_dict.keys()])
+
+        print '--------------------------------------------'
+        print '%30s %12.6f'  % ('E Total',etot)
+
+        return terms_dict
+
+
 
 
 
