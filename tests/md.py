@@ -19,13 +19,15 @@ import numpy as np
 atoms=read(sys.argv[1])
 
 
-calc=OBC()
-calc.parameters['ff']='uff' 
+calc=OBC(atoms=atoms,ff='uff')
+#calc.parameters['ff']='uff'
 
-atoms.set_calculator(calc)
+#atoms.set_calculator(calc)
 
 #Relaxing
-QuasiNewton(atoms).run(fmax=0.005);
+#QuasiNewton(atoms).run(fmax=0.005);
+#or with autoopt
+calc.autoopt(atoms)
 
 
 
@@ -39,8 +41,8 @@ QuasiNewton(atoms).run(fmax=0.005);
 ####################################################################
 def printenergy(a,f):
     """Function to print the potential and kinetic energy."""
-    epot = a.get_potential_energy() 
-    ekin = a.get_kinetic_energy()  
+    epot = a.get_potential_energy()
+    ekin = a.get_kinetic_energy()
     print >>f, 'Mol', epot, ekin
 
 def write_formated(numpy_array,_format=None):
@@ -73,7 +75,7 @@ for s,atm in enumerate(atoms.positions):
             write_formated(atoms.get_forces()[s])
 
 
-MaxwellBoltzmannDistribution(atoms, 5000 * units.kB)
+MaxwellBoltzmannDistribution(atoms, 9000 * units.kB)
 dyn = VelocityVerlet(atoms, .08 * units.fs)   # 10.2 * units.f
 
 for i in range(1000):
