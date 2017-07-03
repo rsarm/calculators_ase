@@ -20,9 +20,13 @@ if len(sys.argv)==1:
 else:
    mol=read(sys.argv[1])
 
-calc=OBC(atoms=mol,ff='uff')
+calc=OBC() #['gaff','ghemical','mmff94','mmff94s','uff']
 
-#mol.set_calculator(calc)
+calc.parameters['atoms'] = mol
+calc.parameters['ff']    = 'uff'
+calc.setup_ff()
+
+mol.set_calculator(calc)
 
 
 # Relax

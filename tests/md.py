@@ -19,10 +19,14 @@ import numpy as np
 atoms=read(sys.argv[1])
 
 
-calc=OBC(atoms=atoms,ff='uff')
-#calc.parameters['ff']='uff'
+calc=OBC() #['gaff','ghemical','mmff94','mmff94s','uff']
 
-#atoms.set_calculator(calc)
+calc.parameters['atoms'] = atoms
+calc.parameters['ff']    = 'mmff94'
+calc.setup_ff()
+
+
+atoms.set_calculator(calc)
 
 #Relaxing
 #QuasiNewton(atoms).run(fmax=0.005);
