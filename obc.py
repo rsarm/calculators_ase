@@ -1,7 +1,14 @@
-"""This module defines an ASE calculator 'obc'.
+"""This module defines an ASE calculator 'OBC' (OpenBabel Calculator).
 
 This calculator uses the force fields implemented in OpenBabel
-to compute energies and numerical forces from them.
+to compute energies and numerical forces.
+
+The implemented force fields are:
+gaff
+ghemical
+mmff94
+mmff94s
+uff
 
 """
 
@@ -145,16 +152,19 @@ class OBC(Calculator):
 
     from ase.io              import read
     from ase.calculators.obc import OBC
+    from ase                 import units
 
     mol=read('mol.xyz')
 
-    calc=OBC(atoms=mol,ff='uff')  # ['gaff','ghemical','mmff94','mmff94s','uff']
+    calc=OBC()
 
-    # Modify the numeric force displacement length
-    # but there is not really need to change this
-    calc.parameters['nfd']=0.0001
+    calc.parameters['atoms'] = mol
+    calc.parameters['ff']    = 'mmff94' # 'gaff', 'ghemical', 'mmff94s', 'uff'
 
-    #mol.set_calculator(calc)
+    # Set up the calculator:
+    calc.setup_ff()
+
+    mol.set_calculator(calc)
 
     print mol.get_potential_energy()
     print mol.get_forces()
@@ -168,33 +178,48 @@ class OBC(Calculator):
 
     implemented_properties = ['energy', 'forces']
 
-    default_parameters = {'nfd' : 0.0001} #numeric force displacement length
+    default_parameters = {'nfd'  : 0.0001,  # Numeric force displacement lenght
+                          'ff'   : 'uff' ,  # FF name
+                          'atoms': None
+                         }
 
     nolabel = True
 
 
 
 
-    def __init__(self, **kwargs):
+    def __init__(self,**kwargs):
         Calculator.__init__(self, **kwargs)
 
-        self.ffname = kwargs['ff']
 
-        # Initializing the FF and the OBMol object
-        self.obff, self.obmol = ob_forcefield(kwargs['atoms'], kwargs['ff'])
+
+
+
+    def setup_ff(self):
+        """xxx."""
+
+        if self.parameters.atoms==None:
+            raise ValueError(
+            """Parameter 'atoms' needs to be specified:
+            calc.parameters['atoms'] = atom # ase.Atoms object
+            """)
 
         # Fixing the units for each ForceField
         # Results are given in eV.
         # The factor 4.1572299 is R/2 (half the gas constant)
-        if self.ffname == 'uff'    or self.ffname=='gaff':
-            self.ffunitfactor = 0.24054479161712947364 #=  1.0 / 4.15722990
-        if self.ffname == 'ghemical':
-            self.ffunitfactor = 0.12027239580856473682 #=  0.5 / 4.15722990
-        if self.ffname == 'mmff94' or self.ffname == 'mmff94s' :
+        if self.parameters.ff == 'uff'    or self.parameters.ff=='gaff':
+            self.ffunitfactor = 0.24054479161712947364 # = 1.0 / 4.15722990
+        #
+        if self.parameters.ff == 'ghemical':
+            self.ffunitfactor = 0.12027239580856473682 # = 0.5 / 4.15722990
+        #
+        if self.parameters.ff == 'mmff94' or self.parameters.ff == 'mmff94s' :
             self.ffunitfactor = 1.
+        #
+        self.ffunitfactor = self.ffunitfactor * units.kcal/units.mol
 
-        self.ffunitfactor = self.ffunitfactor * units.kcal / units.mol
-
+        # Unitializes the FF
+        self.obff, self.obmol = ob_forcefield(self.parameters.atoms, self.parameters.ff)
 
 
 
@@ -206,19 +231,15 @@ class OBC(Calculator):
 
         Calculator.calculate(self, atoms, properties, system_changes)
 
-        # Parameters
-        nfd     = self.parameters.nfd
-
-
         self.results['energy'] = e_ff(self.atoms, self.obmol, self.obff, self.ffunitfactor)
-        self.results['forces'] = f_ff(self.atoms, self.obmol, self.obff, self.ffunitfactor, nfd)
+        self.results['forces'] = f_ff(self.atoms, self.obmol, self.obff, self.ffunitfactor, self.parameters.nfd)
 
 
 
 
 
     def autoopt(self,atoms,nsteps=500,loglevel=0,algo='sd'):
-        """Geometry optimization using the optimizer implemented
+        """Geometry optimization using the optimizers implemented
         in OpenBabel.
         """
 
@@ -240,11 +261,12 @@ class OBC(Calculator):
 
         atoms.set_positions(np.array(opt_positions))
 
-        self.obff.SetLogLevel(0) # setting loglevel back to 0
+        self.obff.SetLogLevel(0) # setting loglevel back to 0 again
 
 
 
-    def get_potential_energies(self,atoms):
+
+    def get_potential_energy_terms(self,atoms,prt=True,energy_unit=units.eV):
         """Energy splitted by terms.
 
         This is a redefinition of get_potential_energies(),
@@ -253,17 +275,18 @@ class OBC(Calculator):
         """
 
         terms_dict={
-        'Bond Stretching'      : self.obff.E_Bond()          * self.ffunitfactor,
-        'Angle Bending'        : self.obff.E_Angle()         * self.ffunitfactor,
-        'Stretch-Bending'      : self.obff.E_StrBnd()        * self.ffunitfactor,
-        'Out-Of-Plane Bending' : self.obff.E_OOP()           * self.ffunitfactor,
-        'Torsional'            : self.obff.E_Torsion()       * self.ffunitfactor,
-        'Van der Waals'        : self.obff.E_VDW()           * self.ffunitfactor,
-        'Electrostatic'        : self.obff.E_Electrostatic() * self.ffunitfactor
+        'Bond Stretching'      : self.obff.E_Bond()         *self.ffunitfactor/energy_unit,
+        'Angle Bending'        : self.obff.E_Angle()        *self.ffunitfactor/energy_unit,
+        'Stretch-Bending'      : self.obff.E_StrBnd()       *self.ffunitfactor/energy_unit,
+        'Out-Of-Plane Bending' : self.obff.E_OOP()          *self.ffunitfactor/energy_unit,
+        'Torsional'            : self.obff.E_Torsion()      *self.ffunitfactor/energy_unit,
+        'Van der Waals'        : self.obff.E_VDW()          *self.ffunitfactor/energy_unit,
+        'Electrostatic'        : self.obff.E_Electrostatic()*self.ffunitfactor/energy_unit
         }
 
-        for k in terms_dict.keys():
-            print '%30s %12.6f' % (k,terms_dict[k])
+        if prt==True:
+            for k in terms_dict.keys():
+                print '%30s %12.6f' % (k,terms_dict[k])
 
 
         etot = sum([terms_dict[k] for k in terms_dict.keys()])
