@@ -54,7 +54,7 @@ def ase2xyz(atoms):
 
 
 
-def mol2tostr(_file):
+def extref2str(_file):
     if _file==None:
         return None
 
@@ -62,31 +62,33 @@ def mol2tostr(_file):
     lines=f.readlines()
     f.close()
 
-    strmol2=''
+    extref_str=''
     for s in lines:
-        strmol2+=s
+        extref_str+=s
 
-    return strmol2
+    fileformat = _file.split('.')[-1]
+
+    return {fileformat: extref_str}
 
 
 
 
 
-def ob_forcefield(atoms,ffname,mol2=None):
+def ob_forcefield(atoms,ffname,extref=None):
     """Sets up the OB force field."""
 
     # Setting up openbabel
     obmol = pybel.ob.OBMol()
     obconversion = pybel.ob.OBConversion()
 
-    if mol2==None:
+    if extref==None:
         obconversion.SetInAndOutFormats("xyz", "mol2")
         # Openbabel reads the mol as .xyz string
         obconversion.ReadString(obmol,ase2xyz(atoms))
     else:
-        obconversion.SetInAndOutFormats("mol2", "mol2")
-        obconversion.ReadString(obmol,mol2)
-
+        fileformat=extref.keys()[0]
+        obconversion.SetInAndOutFormats(fileformat, "mol2")
+        obconversion.ReadString(obmol,extref[fileformat])
 
 
     # Get the FF
@@ -200,10 +202,10 @@ class OBC(Calculator):
 
     implemented_properties = ['energy', 'forces']
 
-    default_parameters = {'nfd'  : 0.0001,  # Numeric force displacement lenght
-                          'ff'   : 'uff' ,  # FF name
-                          'atoms': None,
-                          'mol2' : None
+    default_parameters = {'nfd'    : 0.0001, # Numeric force displacement lenght
+                          'ff'     : 'uff' , # FF name
+                          'atoms'  : None  , # reference molecule as ase.Atoms object
+                          'extref' : None    # reference molecule as file (any format)
                          }
 
     nolabel = True
@@ -219,12 +221,17 @@ class OBC(Calculator):
 
 
     def setup_ff(self):
-        """xxx."""
+        """Unitializes the FF.
 
-        if self.parameters.atoms==None:
+        Note: the parameter 'extref' overrides 'atom'.
+
+        """
+
+        if self.parameters.atoms==None and self.parameters.extref==None:
             raise ValueError(
-            """Parameter 'atoms' needs to be specified:
-            calc.parameters['atoms'] = atom # ase.Atoms object
+            """Either 'atoms' or 'extref' need to be specified:
+            calc.parameters['atoms']  = atom  # ase.Atoms object
+            calc.parameters['extref'] = 'my_ref_molecule.mol2' # Reference molecule
             """)
 
         # Fixing the units for each ForceField
@@ -244,7 +251,7 @@ class OBC(Calculator):
         # Unitializes the FF
         self.obff, self.obmol = ob_forcefield(self.parameters.atoms,
                                               self.parameters.ff,
-                                              mol2tostr(self.parameters.mol2)
+                                              extref2str(self.parameters.extref)
                                              )
 
 
