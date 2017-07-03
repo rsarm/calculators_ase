@@ -54,17 +54,39 @@ def ase2xyz(atoms):
 
 
 
+def mol2tostr(_file):
+    if _file==None:
+        return None
 
-def ob_forcefield(atoms,ffname):
+    f=open(_file,'r')
+    lines=f.readlines()
+    f.close()
+
+    strmol2=''
+    for s in lines:
+        strmol2+=s
+
+    return strmol2
+
+
+
+
+
+def ob_forcefield(atoms,ffname,mol2=None):
     """Sets up the OB force field."""
 
     # Setting up openbabel
     obmol = pybel.ob.OBMol()
     obconversion = pybel.ob.OBConversion()
-    obconversion.SetInAndOutFormats("xyz", "mol")
 
-    # Openbabel reads the mol as .xyz string
-    obconversion.ReadString(obmol,ase2xyz(atoms))
+    if mol2==None:
+        obconversion.SetInAndOutFormats("xyz", "mol2")
+        # Openbabel reads the mol as .xyz string
+        obconversion.ReadString(obmol,ase2xyz(atoms))
+    else:
+        obconversion.SetInAndOutFormats("mol2", "mol2")
+        obconversion.ReadString(obmol,mol2)
+
 
 
     # Get the FF
@@ -180,7 +202,8 @@ class OBC(Calculator):
 
     default_parameters = {'nfd'  : 0.0001,  # Numeric force displacement lenght
                           'ff'   : 'uff' ,  # FF name
-                          'atoms': None
+                          'atoms': None,
+                          'mol2' : None
                          }
 
     nolabel = True
@@ -219,7 +242,10 @@ class OBC(Calculator):
         self.ffunitfactor = self.ffunitfactor * units.kcal/units.mol
 
         # Unitializes the FF
-        self.obff, self.obmol = ob_forcefield(self.parameters.atoms, self.parameters.ff)
+        self.obff, self.obmol = ob_forcefield(self.parameters.atoms,
+                                              self.parameters.ff,
+                                              mol2tostr(self.parameters.mol2)
+                                             )
 
 
 
