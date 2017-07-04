@@ -1,10 +1,11 @@
 
 
-echo  "            Name                 E1_calc      E2_calc    Name           E1_ref          Er_ref"
+echo  "            Name                 OBC         OBC (rel)     Name           OPTIMOL         BatchMin"
+echo  "---------------------------------------------------------------------------------------------------"
 
-for i in `less energies.dat | awk '{print $1}'` ; do
-    calc=`python gs.py ${i}.xyz`
-    echo -n "$calc   "
+for i in `less MMFF94.energies | awk '{print $1}'` ; do
+    calc=`python gs.py $i`
+    echo -n "$calc   | "
 
-    grep $i energies.dat
+    grep $i MMFF94.energies 
 done

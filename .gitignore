@@ -1,5 +1,7 @@
 *.pyc
 __pycache__
 *.so
-tests/traj_ccc.xyz
-tests/newmol.xyz
+tests/traj*_
+tests/mmff94/MMFF94_dative.mol2
+tests/mmff94/MMFF94.energies
+log*

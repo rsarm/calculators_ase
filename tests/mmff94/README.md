@@ -1,14 +1,15 @@
 Tests from
 
-http://www.ccl.net/cca/data/MMFF94/MMFF94_dative.mol2.shtml
+http://www.ccl.net/cca/data/MMFF94/MMFF94_dative.mol2
 
 and
 
-http://www.ccl.net/cca/data/MMFF94/MMFF94.energies.shtml
+http://www.ccl.net/cca/data/MMFF94/MMFF94.energies
 
 
+To run the tests, download both files (MMFF94_dative.mol2 and MMFF94.energies)
+and the run first **split.py MMFF94_dative.mol2** to get the xyz files from the
+list *MMFF94_dative.mol2*. (the header of MMFF94.energies should be removed)
 
-run first *toxyz.py* to get the xyz files from the list *molecules.mol2*
-
-and then run *run.sh* to get the energies to be compared to those
-on the file *energies.dat*
+Then run **run.sh** to get a table with the OBC energies compared to those
+on the file *MMFF94.energies*

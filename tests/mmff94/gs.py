@@ -5,13 +5,13 @@ from ase.calculators.obc import OBC
 from ase                 import units
 
 
-mol=read(sys.argv[1])
+mol=read(sys.argv[1] + '.mol')
 
 
 calc=OBC()
 
-calc.parameters['ref'] = mol
-calc.parameters['ff']    = 'mmff94'
+calc.parameters['ref'] = sys.argv[1] + '.mol' #mol
+calc.parameters['ff']  = 'mmff94'
 calc.setup_ff()
 
 mol.set_calculator(calc)
