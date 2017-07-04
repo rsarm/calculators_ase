@@ -21,7 +21,7 @@ atoms=read(sys.argv[1])
 
 calc=OBC() #['gaff','ghemical','mmff94','mmff94s','uff']
 
-calc.parameters['atoms'] = atoms
+calc.parameters['ref'] = atoms
 calc.parameters['ff']    = 'mmff94'
 calc.setup_ff()
 

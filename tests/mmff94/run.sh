@@ -1,6 +1,6 @@
 
 
-echo  "            Name                 E1_ref       E2_ref     Name           E1_calc         Er_calc"
+echo  "            Name                 E1_calc      E2_calc    Name           E1_ref          Er_ref"
 
 for i in `less energies.dat | awk '{print $1}'` ; do
     calc=`python gs.py ${i}.xyz`

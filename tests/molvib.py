@@ -22,7 +22,7 @@ else:
 
 calc=OBC() #['gaff','ghemical','mmff94','mmff94s','uff']
 
-calc.parameters['atoms'] = mol
+calc.parameters['ref'] = mol
 calc.parameters['ff']    = 'uff'
 calc.setup_ff()
 

@@ -10,9 +10,8 @@ mol=read(sys.argv[1])
 
 calc=OBC() #['gaff','ghemical','mmff94','mmff94s','uff']
 
-#calc.parameters['atoms']  = mol
-calc.parameters['ff']     = 'mmff94'
-calc.parameters['extref'] = 'AMPTRB10.mol2'
+calc.parameters['ff']  = 'mmff94'
+calc.parameters['ref'] = 'AMPTRB10.mol2'
 calc.setup_ff()
 
 mol.set_calculator(calc)
