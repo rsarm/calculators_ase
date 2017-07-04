@@ -27,12 +27,12 @@ import pybel
 
 
 
-def ase2xyz(atoms):
+def ase_to_xyz(atoms):
     """Return a string containing the xyz file.
 
     input:
 
-    * m :: ase Atoms object.
+    * m :: ase.Atoms object.
 
     """
 
@@ -40,55 +40,68 @@ def ase2xyz(atoms):
 
     xyz=str(N)+'\nMol  0.0  0.0\n'
 
-    # Loop first over the first N-1 atoms.
-    # The last line of the xyz file is added after the loop
-    # to avoid an empty line at the end of the file.
-    for i in range(N-1):
+    for i in range(N):
         xyz+=atoms.get_chemical_symbols()[i]+\
         ' '.join("%16.8f" % n for n in atoms.positions[i])+'\n'
 
-    return xyz+atoms.get_chemical_symbols()[N-1]+\
-        ' '.join("%16.8f" % n for n in atoms.positions[N-1])
-#
-
-
-
-
-def extref2str(_file):
-    if _file==None:
-        return None
-
-    f=open(_file,'r')
-    lines=f.readlines()
-    f.close()
-
-    extref_str=''
-    for s in lines:
-        extref_str+=s
-
-    fileformat = _file.split('.')[-1]
-
-    return {fileformat: extref_str}
+    return xyz[:-1] # To avoid an empy line at the end.
 
 
 
 
 
-def ob_forcefield(atoms,ffname,extref=None):
-    """Sets up the OB force field."""
+
+def set_reference(ref):
+    """Returns a dictionary with the format and
+    reference molecule as string.
+
+    input:
+
+    * ref :: ase.Atoms object or path to a molecule file.
+
+    """
+
+    # If the reference is an ase.Atoms object:
+    if hasattr(ref,'get_chemical_symbols'):
+        return {'format':'xyz',
+                'molstr': ase_to_xyz(ref)}
+    #
+    # If reference is a molecule file:
+    elif type(ref)==str:
+        f=open(ref,'r')
+        lines=f.readlines()
+        f.close()
+
+        ref_str=''
+        for s in lines:
+            ref_str+=s
+
+        return {'format': ref.split('.')[-1],
+                'molstr': ref_str}
+
+
+
+
+
+
+def ob_forcefield(reference_dict, ffname):
+    """Sets up the OB force field.
+
+    input:
+
+    * reference_dict :: python dictionary, like
+                        {'format':'xyz',
+                         'molstr':'2\nMol\nH 0.0 0.0 0.0\nH 0.7 0.0 0.0'}.
+    * ffname         :: string with ff name, like 'uff'.
+
+    """
 
     # Setting up openbabel
     obmol = pybel.ob.OBMol()
     obconversion = pybel.ob.OBConversion()
 
-    if extref==None:
-        obconversion.SetInAndOutFormats("xyz", "mol2")
-        # Openbabel reads the mol as .xyz string
-        obconversion.ReadString(obmol,ase2xyz(atoms))
-    else:
-        fileformat=extref.keys()[0]
-        obconversion.SetInAndOutFormats(fileformat, "mol2")
-        obconversion.ReadString(obmol,extref[fileformat])
+    obconversion.SetInAndOutFormats(reference_dict['format'], "mol2")
+    obconversion.ReadString(obmol,  reference_dict['molstr'])
 
 
     # Get the FF
@@ -109,7 +122,13 @@ def ob_forcefield(atoms,ffname,extref=None):
 def e_ff(atoms, obmol, obff, ffunitfactor):
     """Potential energy computed with a force field of openbabel.
 
-    * atoms :: ase Atoms object
+    input:
+
+    * atoms        :: ase.Atoms object.
+    * obmol        :: OpenBabel OBMol object.
+    * obff         :: Initialized OpenBabel forcefield object.
+    * ffunitfactor :: Unit factor (float).
+
     """
 
     # Update self.obmol coordinates.
@@ -137,7 +156,19 @@ def numeric_force(atoms, a, i, obmol, obff, ffunitfactor, d):
     plus/minus d in the i'th axial direction, respectively.
 
     Based in ase.calculators.test
+
+    input:
+
+    * atoms        :: ase.Atoms object.
+    * a            :: Atom index (int).
+    * i            :: Coordinate index (0,1 or 2).
+    * obmol        :: OpenBabel OBMol object.
+    * obff         :: Initialized OpenBabel forcefield object.
+    * ffunitfactor :: Unit factor (float).
+    * d            :: Numeric force displacement lenght (float).
+
     """
+
     p0 = atoms.positions[a, i]
     atoms.positions[a, i] += d
     eplus  = e_ff(atoms, obmol, obff, ffunitfactor)
@@ -154,14 +185,20 @@ def numeric_force(atoms, a, i, obmol, obff, ffunitfactor, d):
 
 
 
-def f_ff(atoms, obmol, obff, ffunitfactor, nfd):
+def f_ff(atoms, obmol, obff, ffunitfactor, d):
     """Evaluate numeric forces.
 
-    Args:
-    * atoms     :: ASE Atoms object
+    input:
+
+    * atoms        :: ase.Atoms object.
+    * obmol        :: OpenBabel OBMol object.
+    * obff         :: Initialized OpenBabel forcefield object.
+    * ffunitfactor :: Unit factor (float).
+    * d            :: Numeric force displacement lenght (float).
+
     """
 
-    return np.array([[numeric_force(atoms, a, i, obmol, obff, ffunitfactor, nfd)
+    return np.array([[numeric_force(atoms, a, i, obmol, obff, ffunitfactor, d)
             for i in range(3)] for a in range(len(atoms))])
 #
 
@@ -202,10 +239,10 @@ class OBC(Calculator):
 
     implemented_properties = ['energy', 'forces']
 
-    default_parameters = {'nfd'    : 0.0001, # Numeric force displacement lenght
-                          'ff'     : 'uff' , # FF name
-                          'atoms'  : None  , # reference molecule as ase.Atoms object
-                          'extref' : None    # reference molecule as file (any format)
+    default_parameters = {'nfd' : 0.0001, # Numeric force displacement lenght
+                          'ff'  : 'uff' , # FF name
+                          'ref' : None    # reference molecule as file (any format) 
+                                          # or ase.Atoms object
                          }
 
     nolabel = True
@@ -221,17 +258,14 @@ class OBC(Calculator):
 
 
     def setup_ff(self):
-        """Unitializes the FF.
+        """Initializes the OpenBabel FF."""
 
-        Note: the parameter 'extref' overrides 'atom'.
-
-        """
-
-        if self.parameters.atoms==None and self.parameters.extref==None:
+        if self.parameters.ref==None:
             raise ValueError(
-            """Either 'atoms' or 'extref' need to be specified:
-            calc.parameters['atoms']  = atom  # ase.Atoms object
-            calc.parameters['extref'] = 'my_ref_molecule.mol2' # Reference molecule
+            """Parameter 'ref' needs to be specified:
+            Example:
+            calc.parameters['ref']  = atom                  # ase.Atoms object.
+            calc.parameters['ref'] = 'my_ref_molecule.mol2' # Reference file.
             """)
 
         # Fixing the units for each ForceField
@@ -248,11 +282,9 @@ class OBC(Calculator):
         #
         self.ffunitfactor = self.ffunitfactor * units.kcal/units.mol
 
-        # Unitializes the FF
-        self.obff, self.obmol = ob_forcefield(self.parameters.atoms,
-                                              self.parameters.ff,
-                                              extref2str(self.parameters.extref)
-                                             )
+        # Initializing the OpenBabel FF
+        self.obff, self.obmol = ob_forcefield(set_reference(self.parameters.ref),
+                                              self.parameters.ff)
 
 
 
@@ -274,6 +306,16 @@ class OBC(Calculator):
     def autoopt(self,atoms,nsteps=500,loglevel=0,algo='sd'):
         """Geometry optimization using the optimizers implemented
         in OpenBabel.
+
+        input:
+
+        * atoms    :: ase.Atoms object.
+        * nsteps   :: Number of optimization steps (int).
+        * loglevel :: loglevel for OpenBabel FF (0,1,2 or 3).
+        * algo     :: Algorithms for minimization
+                      'conjugategradients' (short 'cg') or
+                      'steepestdescent' (short 'sd')
+
         """
 
         # The highest is 3 (pybel.ob.OBFF_LOGLVL_HIGH)
@@ -304,6 +346,12 @@ class OBC(Calculator):
 
         This is a redefinition of get_potential_energies(),
         with a pourpose different to what it's originally intended.
+
+        input:
+
+        * atoms       :: ase.Atoms object.
+        * prt         :: Print energy terms or not (bool)
+        * energy_unit :: Output and print units (values defined in ase.units)
 
         """
 
