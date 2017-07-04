@@ -119,7 +119,7 @@ def ob_forcefield(reference_dict, ffname):
 
 
 
-def e_ff(atoms, obmol, obff, ffunitfactor):
+def e_ff(atoms, obmol, obff):
     """Potential energy computed with a force field of openbabel.
 
     input:
@@ -127,7 +127,6 @@ def e_ff(atoms, obmol, obff, ffunitfactor):
     * atoms        :: ase.Atoms object.
     * obmol        :: OpenBabel OBMol object.
     * obff         :: Initialized OpenBabel forcefield object.
-    * ffunitfactor :: Unit factor (float).
 
     """
 
@@ -141,7 +140,7 @@ def e_ff(atoms, obmol, obff, ffunitfactor):
     obff.SetCoordinates(obmol)
 
     # The factor 4.1572299 is R/2 (half the gas constant)
-    return obff.Energy() * ffunitfactor # Result in eV
+    return obff.Energy() * units.kcal / units.mol # Result in eV
 
 
 
@@ -149,7 +148,7 @@ def e_ff(atoms, obmol, obff, ffunitfactor):
 
 
 
-def numeric_force(atoms, a, i, obmol, obff, ffunitfactor, d):
+def numeric_force(atoms, a, i, obmol, obff, d):
     """Evaluate force along i'th axis on a'th atom using finite difference.
 
     This will trigger two calls to get_potential_energy(), with atom a moved
@@ -164,16 +163,15 @@ def numeric_force(atoms, a, i, obmol, obff, ffunitfactor, d):
     * i            :: Coordinate index (0,1 or 2).
     * obmol        :: OpenBabel OBMol object.
     * obff         :: Initialized OpenBabel forcefield object.
-    * ffunitfactor :: Unit factor (float).
     * d            :: Numeric force displacement lenght (float).
 
     """
 
     p0 = atoms.positions[a, i]
     atoms.positions[a, i] += d
-    eplus  = e_ff(atoms, obmol, obff, ffunitfactor)
+    eplus  = e_ff(atoms, obmol, obff)
     atoms.positions[a, i] -= 2 * d
-    eminus = e_ff(atoms, obmol, obff, ffunitfactor)
+    eminus = e_ff(atoms, obmol, obff)
     atoms.positions[a, i] = p0
 
 
@@ -185,7 +183,7 @@ def numeric_force(atoms, a, i, obmol, obff, ffunitfactor, d):
 
 
 
-def f_ff(atoms, obmol, obff, ffunitfactor, d):
+def f_ff(atoms, obmol, obff, d):
     """Evaluate numeric forces.
 
     input:
@@ -193,12 +191,11 @@ def f_ff(atoms, obmol, obff, ffunitfactor, d):
     * atoms        :: ase.Atoms object.
     * obmol        :: OpenBabel OBMol object.
     * obff         :: Initialized OpenBabel forcefield object.
-    * ffunitfactor :: Unit factor (float).
     * d            :: Numeric force displacement lenght (float).
 
     """
 
-    return np.array([[numeric_force(atoms, a, i, obmol, obff, ffunitfactor, d)
+    return np.array([[numeric_force(atoms, a, i, obmol, obff, d)
             for i in range(3)] for a in range(len(atoms))])
 #
 
@@ -268,19 +265,6 @@ class OBC(Calculator):
             calc.parameters['ref'] = 'my_ref_molecule.mol2' # Reference file.
             """)
 
-        # Fixing the units for each ForceField
-        # Results are given in eV.
-        # The factor 4.1572299 is R/2 (half the gas constant)
-        if self.parameters.ff == 'uff'    or self.parameters.ff=='gaff':
-            self.ffunitfactor = 0.24054479161712947364 # = 1.0 / 4.15722990
-        #
-        if self.parameters.ff == 'ghemical':
-            self.ffunitfactor = 0.12027239580856473682 # = 0.5 / 4.15722990
-        #
-        if self.parameters.ff == 'mmff94' or self.parameters.ff == 'mmff94s' :
-            self.ffunitfactor = 1.
-        #
-        self.ffunitfactor = self.ffunitfactor * units.kcal/units.mol
 
         # Initializing the OpenBabel FF
         self.obff, self.obmol = ob_forcefield(set_reference(self.parameters.ref),
@@ -296,8 +280,8 @@ class OBC(Calculator):
 
         Calculator.calculate(self, atoms, properties, system_changes)
 
-        self.results['energy'] = e_ff(self.atoms, self.obmol, self.obff, self.ffunitfactor)
-        self.results['forces'] = f_ff(self.atoms, self.obmol, self.obff, self.ffunitfactor, self.parameters.nfd)
+        self.results['energy'] = e_ff(self.atoms, self.obmol, self.obff)
+        self.results['forces'] = f_ff(self.atoms, self.obmol, self.obff, self.parameters.nfd)
 
 
 
@@ -356,13 +340,13 @@ class OBC(Calculator):
         """
 
         terms_dict={
-        'Bond Stretching'      : self.obff.E_Bond()         *self.ffunitfactor/energy_unit,
-        'Angle Bending'        : self.obff.E_Angle()        *self.ffunitfactor/energy_unit,
-        'Stretch-Bending'      : self.obff.E_StrBnd()       *self.ffunitfactor/energy_unit,
-        'Out-Of-Plane Bending' : self.obff.E_OOP()          *self.ffunitfactor/energy_unit,
-        'Torsional'            : self.obff.E_Torsion()      *self.ffunitfactor/energy_unit,
-        'Van der Waals'        : self.obff.E_VDW()          *self.ffunitfactor/energy_unit,
-        'Electrostatic'        : self.obff.E_Electrostatic()*self.ffunitfactor/energy_unit
+        'Bond Stretching'      : self.obff.E_Bond()         * units.kcal / units.mol /energy_unit,
+        'Angle Bending'        : self.obff.E_Angle()        * units.kcal / units.mol /energy_unit,
+        'Stretch-Bending'      : self.obff.E_StrBnd()       * units.kcal / units.mol /energy_unit,
+        'Out-Of-Plane Bending' : self.obff.E_OOP()          * units.kcal / units.mol /energy_unit,
+        'Torsional'            : self.obff.E_Torsion()      * units.kcal / units.mol /energy_unit,
+        'Van der Waals'        : self.obff.E_VDW()          * units.kcal / units.mol /energy_unit,
+        'Electrostatic'        : self.obff.E_Electrostatic()* units.kcal / units.mol /energy_unit
         }
 
         if prt==True:
@@ -394,6 +378,22 @@ class OBC(Calculator):
 ############
 # Old code #
 ############
+
+
+        ## Fixing the units for each ForceField
+        ## Results are given in eV.
+        ## The factor 4.1572299 is R/2 (half the gas constant)
+        #if self.parameters.ff == 'uff'    or self.parameters.ff=='gaff':
+            #self.ffunitfactor = 1. #0.24054479161712947364 # = 1.0 / 4.15722990
+        ##
+        #if self.parameters.ff == 'ghemical':
+            #self.ffunitfactor = 1 #0.12027239580856473682 # = 0.5 / 4.15722990
+        ##
+        #if self.parameters.ff == 'mmff94' or self.parameters.ff == 'mmff94s' :
+            #self.ffunitfactor = 1.
+        ##
+        #self.ffunitfactor = self.ffunitfactor * units.kcal/units.mol
+
 
 def _e_ff(atoms,ffname,ffunitfactor):
     """Potential energy computed with a force field of openbabel.
