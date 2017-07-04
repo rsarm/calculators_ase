@@ -16,10 +16,10 @@ calc.setup_ff()
 
 mol.set_calculator(calc)
 
-print '%20s     ' % (sys.argv[1].split('.')[0]),
+print '%20s     ' % (sys.argv[1]),
 print '   %12.6f' % (mol.get_potential_energy() / units.kcal*units.mol),
 
 # Optimize
 calc.autoopt(mol)
 
-print '%12.6f'   % (mol.get_potential_energy() / units.kcal*units.mol)
+print '%12.6f'    % (mol.get_potential_energy() / units.kcal*units.mol)
